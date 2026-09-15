@@ -2,15 +2,26 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setMessage('Connexion Supabase sera activée dans la prochaine étape.')
+    setLoading(true)
+    setMessage('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(false)
+    if (error) return setMessage(error.message)
+    router.push('/dashboard')
+    router.refresh()
   }
 
   return (
@@ -23,9 +34,9 @@ export default function LoginPage() {
         <form onSubmit={submit} className="form-stack">
           <label>Email<input className="problem-input" type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label>
           <label>Mot de passe<input className="problem-input" type="password" value={password} onChange={e => setPassword(e.target.value)} required /></label>
-          <button className="button" type="submit">Se connecter</button>
+          <button className="button" type="submit" disabled={loading}>{loading ? 'Connexion…' : 'Se connecter'}</button>
         </form>
-        {message && <p className="muted">{message}</p>}
+        {message && <p className="error-text">{message}</p>}
         <p className="muted">Pas encore de compte ? <Link href="/register">Créer un compte</Link></p>
       </div>
     </main>
