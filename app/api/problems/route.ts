@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { analyzeProblem } from '@/lib/ai/analyze'
 
 const schema = z.object({
   description: z.string().min(10).max(12000),
@@ -14,15 +15,8 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
     const body = schema.parse(await request.json())
-    const aiResponse = await fetch(new URL('/api/ai/analyze', request.url), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', cookie: request.headers.get('cookie') || '' },
-      body: JSON.stringify(body),
-    })
-    const aiData = await aiResponse.json()
-    if (!aiResponse.ok) return NextResponse.json(aiData, { status: aiResponse.status })
+    const { analysis, mode, model } = await analyzeProblem(body.description, body.category)
 
-    const analysis = aiData.analysis
     const { data: problem, error } = await supabase.from('problems').insert({
       user_id: user.id,
       title: analysis.title,
@@ -34,13 +28,28 @@ export async function POST(request: Request) {
     }).select('id').single()
     if (error || !problem) return NextResponse.json({ error: error?.message || 'Création impossible.' }, { status: 500 })
 
-    const actions = (analysis.recommended_actions || []).map((item: string, index: number) => ({ problem_id: problem.id, user_id: user.id, title: item, position: index, completed: false }))
-    const checklist = (analysis.checklist || []).map((item: string, index: number) => ({ problem_id: problem.id, user_id: user.id, title: item, position: index + actions.length, completed: false }))
-    if ([...actions, ...checklist].length) await supabase.from('action_items').insert([...actions, ...checklist])
-    await supabase.from('problem_history').insert({ problem_id: problem.id, user_id: user.id, event_type: 'created', metadata: { source: aiData.mode || 'ai' } })
-    await supabase.from('ai_generations').insert({ user_id: user.id, problem_id: problem.id, model: process.env.OPENAI_MODEL || 'gpt-5-mini', prompt_version: 'v1', result: analysis })
+    const actions = analysis.recommended_actions.map((item, index) => ({
+      problem_id: problem.id, user_id: user.id, title: item.title,
+      description: item.description, position: index, completed: false,
+    }))
+    const checklist = analysis.checklist.map((item, index) => ({
+      problem_id: problem.id, user_id: user.id, title: item.title,
+      description: item.description, position: index + actions.length, completed: item.completed,
+    }))
+    const allItems = [...actions, ...checklist]
+    if (allItems.length) {
+      const { error: actionError } = await supabase.from('action_items').insert(allItems)
+      if (actionError) return NextResponse.json({ error: actionError.message }, { status: 500 })
+    }
 
-    return NextResponse.json({ id: problem.id })
+    await supabase.from('problem_history').insert({
+      problem_id: problem.id, user_id: user.id, event_type: 'created', metadata: { source: mode },
+    })
+    await supabase.from('ai_generations').insert({
+      user_id: user.id, problem_id: problem.id, model, prompt_version: 'v2', result: analysis,
+    })
+
+    return NextResponse.json({ id: problem.id, mode })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur inattendue.' }, { status: 400 })
   }
