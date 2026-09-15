@@ -14,7 +14,7 @@ export default function NewProblemPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setLoading(true); setError('')
     try {
-      const response = await fetch('/api/problems/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description, category }) })
+      const response = await fetch('/api/problems', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description, category }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Création impossible')
       router.push(`/problems/${data.id}`)
