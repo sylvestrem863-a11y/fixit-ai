@@ -39,6 +39,6 @@ export function Documents({ problemId, initialDocuments }: { problemId: string; 
     <button className="button secondary" disabled={loading} onClick={() => inputRef.current?.click()}>{loading ? 'Téléversement…' : '+ Ajouter un document'}</button>
     <p className="muted">PDF, JPG, PNG ou WEBP · maximum 10 Mo · stockage privé</p>
     {message && <p className="error-text">{message}</p>}
-    {documents.length > 0 && <div className="document-list">{documents.map(doc => <div className="document-row" key={doc.id}><div><strong>{doc.file_name}</strong><span className="muted">{size(doc.size_bytes)}</span></div><button className="text-button" onClick={() => remove(doc.id)}>Supprimer</button></div>)}</div>}
+    {documents.length > 0 && <div className="document-list">{documents.map(doc => <div className="document-row" key={doc.id}><div><strong>{doc.file_name}</strong><span className="muted">{size(doc.size_bytes)}</span></div><div className="document-actions"><a className="text-button" href={`/api/documents/${doc.id}/download`} target="_blank" rel="noreferrer">Ouvrir</a><button className="text-button" onClick={() => remove(doc.id)}>Supprimer</button></div></div>)}</div>}
   </div>
 }
