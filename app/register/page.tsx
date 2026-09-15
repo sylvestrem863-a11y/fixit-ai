@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const supabase = createClient()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,22 +14,22 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setMessage('')
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
-    setLoading(false)
-    if (error) return setMessage(error.message)
-    if (data.session) router.push('/dashboard')
-    else setMessage('Compte créé. Vérifie ton courriel pour confirmer ton adresse.')
+    e.preventDefault(); setLoading(true); setMessage('')
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
+      if (error) return setMessage(error.message)
+      if (data.session) router.push('/dashboard')
+      else setMessage('Compte créé. Vérifie ton courriel pour confirmer ton adresse.')
+    } catch { setMessage('Configuration Supabase indisponible. Vérifie les variables de connexion.') }
+    finally { setLoading(false) }
   }
 
   return (
     <main className="container auth-page">
       <Link href="/" className="logo">FixIt<span style={{color:'#78a7ff'}}>.</span></Link>
       <div className="auth-card card">
-        <span className="badge">Commence gratuitement</span>
-        <h1>Créer ton compte</h1>
+        <span className="badge">Commence gratuitement</span><h1>Créer ton compte</h1>
         <p className="muted">Retrouve tes problèmes et tes plans d’action au même endroit.</p>
         <form onSubmit={submit} className="form-stack">
           <label>Nom<input className="problem-input" type="text" value={name} onChange={e => setName(e.target.value)} required /></label>
