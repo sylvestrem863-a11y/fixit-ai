@@ -3,14 +3,18 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Checklist } from './checklist'
 import { StatusActions } from './status-actions'
+import { Documents } from './documents'
 
 export default async function ProblemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: problem } = await supabase.from('problems').select('*').eq('id', id).single()
   if (!problem) notFound()
-  const { data: actions } = await supabase.from('action_items').select('id,title,description,completed,position').eq('problem_id', id).order('position')
-  const { data: history } = await supabase.from('problem_history').select('id,event_type,created_at').eq('problem_id', id).order('created_at', { ascending: false }).limit(10)
+  const [{ data: actions }, { data: history }, { data: documents }] = await Promise.all([
+    supabase.from('action_items').select('id,title,description,completed,position').eq('problem_id', id).order('position'),
+    supabase.from('problem_history').select('id,event_type,created_at').eq('problem_id', id).order('created_at', { ascending: false }).limit(10),
+    supabase.from('documents').select('id,file_name,mime_type,size_bytes,created_at').eq('problem_id', id).order('created_at', { ascending: false }),
+  ])
   const analysis = (problem.ai_analysis || {}) as Record<string, any>
 
   return (
@@ -19,9 +23,10 @@ export default async function ProblemDetailPage({ params }: { params: Promise<{ 
       <section className="dashboard-head"><span className="badge">Plan FixIt</span><h1>{problem.title}</h1><p className="muted">{problem.description}</p><div className="problem-meta"><span className={`priority priority-${problem.priority}`}>{problem.priority}</span><span>{problem.status}</span></div><StatusActions id={id} status={problem.status} /></section>
       {analysis.summary && <section className="card"><h2>Résumé</h2><p>{analysis.summary}</p></section>}
       <section className="card detail-section"><h2>Plan d’action</h2><Checklist items={actions || []} /></section>
+      <section className="card detail-section"><h2>Documents</h2><Documents problemId={id} initialDocuments={documents || []} /></section>
       {(analysis.warnings?.length || analysis.documents_to_keep?.length || analysis.required_information?.length) ? <section className="grid detail-grid">
         {analysis.warnings?.length ? <article className="card"><h2>⚠️ À surveiller</h2><ul>{analysis.warnings.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
-        {analysis.documents_to_keep?.length ? <article className="card"><h2>📄 Documents</h2><ul>{analysis.documents_to_keep.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
+        {analysis.documents_to_keep?.length ? <article className="card"><h2>📄 Documents recommandés</h2><ul>{analysis.documents_to_keep.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
         {analysis.required_information?.length ? <article className="card"><h2>ℹ️ Informations</h2><ul>{analysis.required_information.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
       </section> : null}
       <section className="card"><h2>Historique</h2>{history?.length ? <ul className="history-list">{history.map(item => <li key={item.id}><strong>{item.event_type.replaceAll('_', ' ')}</strong><span className="muted">{new Date(item.created_at).toLocaleString('fr-CA')}</span></li>)}</ul> : <p className="muted">Aucun événement.</p>}</section>
