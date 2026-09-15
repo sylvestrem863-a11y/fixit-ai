@@ -16,7 +16,7 @@ export default async function ProblemDetailPage({ params }: { params: Promise<{ 
   const [{ data: actions }, { data: history }, { data: documents }, { data: notes }] = await Promise.all([
     supabase.from('action_items').select('id,title,description,completed,position').eq('problem_id', id).eq('user_id', user.id).order('position'),
     supabase.from('problem_history').select('id,event_type,created_at').eq('problem_id', id).eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-    supabase.from('documents').select('id,file_name,mime_type,size_bytes,created_at').eq('problem_id', id).eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('documents').select('id,file_name,mime_type,size_bytes,created_at,ai_analysis,analysis_status,analyzed_at').eq('problem_id', id).eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('notes').select('id,content,created_at').eq('problem_id', id).eq('user_id', user.id).order('created_at', { ascending: false }),
   ])
   const analysis = (problem.ai_analysis || {}) as Record<string, any>
@@ -28,7 +28,7 @@ export default async function ProblemDetailPage({ params }: { params: Promise<{ 
       {analysis.summary && <section className="card"><h2>Résumé</h2><p>{analysis.summary}</p></section>}
       <section className="card detail-section"><h2>Plan d’action</h2><Checklist items={actions || []} /></section>
       <section className="card detail-section"><h2>Notes</h2><Notes problemId={id} initialNotes={notes || []} /></section>
-      <section className="card detail-section"><h2>Documents</h2><Documents problemId={id} initialDocuments={documents || []} /></section>
+      <section className="card detail-section"><h2>Documents & analyse IA</h2><Documents problemId={id} initialDocuments={documents || []} /></section>
       {(analysis.warnings?.length || analysis.documents_to_keep?.length || analysis.required_information?.length) ? <section className="grid detail-grid">
         {analysis.warnings?.length ? <article className="card"><h2>⚠️ À surveiller</h2><ul>{analysis.warnings.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
         {analysis.documents_to_keep?.length ? <article className="card"><h2>📄 Documents recommandés</h2><ul>{analysis.documents_to_keep.map((x: string) => <li key={x}>{x}</li>)}</ul></article> : null}
